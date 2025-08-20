@@ -1,0 +1,11 @@
+[Unit]
+Description=pxfn lock setting manager
+Requires=pxfnlock-restore.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/pxFnLock
+TimeoutSec=5
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,11 @@
+[Unit]
+Description=restore px hotkey settings on sleep wake
+After=sleep.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/pxFnLock restore
+TimeoutSec=5
+
+[Install]
+WantedBy=sleep.target

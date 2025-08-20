@@ -345,6 +345,34 @@ int write_state(int new_state)
     return 0;
 }
 
+int restore(int state)
+{
+    // restore the default state
+    printf("restoring state oneshot\n");
+
+    int err;
+    hid_device_info_t device_info;
+    hid_sub_paths_t devices;
+
+    err = find_hid_id(VID_PID, &device_info);
+    if (err)
+    {
+        printf("Failed to find hid\n");
+        return -1;
+    }
+
+    err = find_hid_devices_paths(device_info.hid_path, &devices);
+    if (err) {
+        fprintf(stderr, "Failed to find HID devices\n");
+        return -1;
+    }
+
+    toggle_fnlock(devices.hidraw_device, state);
+    printf("restored state: %d\n", state);
+
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     int fn_state = read_statefile();
@@ -352,6 +380,10 @@ int main(int argc, char **argv)
     {
         printf("Failed to read state file\n");
         return -1;
+    }
+
+    if (argc > 1 && strcmp(argv[1], "restore") == 0) {
+        return restore(fn_state);
     }
 
     hid_device_info_t device_info;

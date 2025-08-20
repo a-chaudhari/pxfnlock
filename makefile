@@ -19,4 +19,10 @@ clean:
 run: $(TARGET)
 	./$(TARGET)
 
+install: $(TARGET)
+	cp $(TARGET) /usr/local/bin/
+	cp pxfnlock.service /etc/systemd/system/
+	cp pxfnlock-restore.service /etc/systemd/system/
+	systemctl daemon-reload
+
 .PHONY: all clean run
