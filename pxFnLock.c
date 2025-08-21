@@ -195,18 +195,19 @@ int find_hid_id(const char *search_id, hid_device_info_t *info) {
                 continue;
             }
 
-            // read first 9 bytes of the report descriptor
-            unsigned char report_descriptor[9];
+            // read first 4kb of the report descriptor
+            unsigned char report_descriptor[4096];
             size_t bytes_read = fread(report_descriptor, 1, sizeof(report_descriptor), fp);
             fclose(fp);
-            if (bytes_read < 9) {
+            if (bytes_read <= 0) {
                 printf("Failed to read report descriptor for device %s\n", entry->d_name);
                 continue;
             }
 
             // check against the expected report descriptor
             unsigned char expected_descriptor[] = {0x06, 0x31, 0xff, 0x09, 0x76, 0xa1, 0x01, 0x85, 0x5a};
-            if (memcmp(report_descriptor, &expected_descriptor, sizeof(expected_descriptor)) == 0)
+            void *status = memmem(report_descriptor, bytes_read, expected_descriptor, sizeof(expected_descriptor));
+            if (status != NULL)
             {
                 // extract the id (the number after the last period in the directory name)
                 char *colon_pos = strrchr(entry->d_name, '.');
@@ -220,7 +221,7 @@ int find_hid_id(const char *search_id, hid_device_info_t *info) {
             }
         }
     }
-
+    printf("No suitable HID device found with VID:PID %s\n", search_id);
     closedir(dir);
     return -1;
 }
