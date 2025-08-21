@@ -1,6 +1,7 @@
 #include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
+#include "common.h"
 
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
@@ -8,6 +9,11 @@ struct {
     __type(value, u32);
     __uint(max_entries, 32);
 } remap_map SEC(".maps");
+
+struct{
+    __uint(type, BPF_MAP_TYPE_RINGBUF);
+    __uint(max_entries, 4096); // 4kb, needs to be mult of page size
+} event_rb SEC(".maps");
 
 SEC("struct_ops/hid_bpf_device_event")
 int BPF_PROG(modify_hid_event, struct hid_bpf_ctx *hid_ctx)
@@ -28,14 +34,21 @@ int BPF_PROG(modify_hid_event, struct hid_bpf_ctx *hid_ctx)
     // bpf_printk("Event: %x, %x, %x, %x, %x, %x", data[0],
     //   data[1], data[2], data[3], data[4], data[5]);
 
+    struct event_log_entry entry = {
+        .original = data[1],
+        .remapped = 0,
+        .new = 0,
+    };
+
     value = bpf_map_lookup_elem(&remap_map, &data[1]);
     if (value)
     {
-        bpf_printk("Remapping scancode: %x -> %x", data[1], *value);
+        entry.new = *value;
+        entry.remapped = 1;
         data[1] = *value; // remap the scancode if it exists in the map
-    } else {
-        bpf_printk("No remap found for scancode: %x", data[1]);
     }
+
+    bpf_ringbuf_output(&event_rb, &entry, sizeof(struct event_log_entry), 0);
 
     return 0;
 }

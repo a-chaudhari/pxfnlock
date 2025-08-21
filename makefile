@@ -10,8 +10,8 @@ $(BPF_OBJ): bpf/hid_modify.bpf.c
 $(SKEL_H): $(BPF_OBJ)
 	bpftool gen skeleton $< > $@
 
-$(TARGET): pxFnLock.c $(SKEL_H)
-	gcc -O2 -o $@ $< -lbpf
+$(TARGET): $(wildcard *.c) bpf/loader.c $(SKEL_H)
+	gcc -O2 -o $@ $(filter %.c,$^) -lbpf
 
 clean:
 	rm -f $(BPF_OBJ) $(SKEL_H) $(TARGET)

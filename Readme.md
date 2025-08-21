@@ -41,7 +41,3 @@ drops it (along with a few other ones). This tool packages a bpf program to modi
 | Fn+Esc       | Fn-Lock     | KEY_PROG3         |
 | Fn+F7        | Emoji Key   | KEY_PROG2         |
 | Fn+F12       | ProArt Key  | KEY_PROG1         |
-
-## Debugging
-* bpf program output can be viewed by `sudo cat /sys/kernel/debug/tracing/trace_pipe`
-* 

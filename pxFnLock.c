@@ -11,81 +11,12 @@
 #include <sys/ioctl.h>
 #include <linux/input.h>
 #include <linux/hidraw.h>
+#include "bpf/loader.h"
+#include <pthread.h>
+#include "file_state.h"
+#include "bpf/common.h"
 
-#define FN_LOCK_DEFAULT_VALUE 0 // 0 = fn lock on, 1 = fn lock off
-#define MAX_PATH 512
 #define VID_PID "0B05:19B6" // Asus ProArt Keyboard VID:PID
-
-typedef struct {
-    char input_device[MAX_PATH];
-    char hidraw_device[MAX_PATH];
-} hid_sub_paths_t;
-
-typedef struct {
-    char hid_path[MAX_PATH];
-    int hid_id;
-} hid_device_info_t;
-
-/// @param skel skeleton for the BPF program
-/// @param hid_id hid id number to bind the BPF program to
-/// @return 0 on success, -1 on error
-int run_bpf(struct hid_modify_bpf *skel, int hid_id)
-{
-    int err, map_fd;
-
-    // Open and load the BPF program
-    skel = hid_modify_bpf__open();
-    if (!skel) {
-        fprintf(stderr, "Failed to open BPF skeleton\n");
-        return -1;
-    }
-
-    /*
-     * this is a simple 1d array, add maps as pairs of: original scancode, new scancode
-     * 1. use hid-recorder to find the original scancode from the keyboard
-     * 2. read the hid-asus.c file to see what scancodes are recognized by the driver
-     * 3. remap the original scancode to one that is detected by the driver but isn't used for anything on yours
-     * 4. you can now use that keycode and bind functions using keyd or any other tool
-     */
-    const int remaps[] = {
-        0x4e, 0x5c, // fn-lock (fn + esc) -> key_prog3
-        0x7e, 0xba, // emoji picker key -> key_prog2
-        0x8b, 0x38, // proart hub key -> key_prog1
-    };
-
-    skel->struct_ops.hid_modify_ops->hid_id = hid_id;
-
-    err = hid_modify_bpf__load(skel);
-    if (err) {
-        fprintf(stderr, "Failed to load BPF skeleton\n");
-        return -1;
-   }
-
-    // Attach to HID device
-    err = hid_modify_bpf__attach(skel);
-    if (err) {
-        fprintf(stderr, "Failed to attach BPF program\n");
-        hid_modify_bpf__destroy(skel);
-        return -1;
-    }
-
-    map_fd = bpf_map__fd(skel->maps.remap_map);
-    if (map_fd < 0) {
-        fprintf(stderr, "Failed to get map fd\n");
-        hid_modify_bpf__destroy(skel);
-        return -1;
-    }
-
-    for (int i = 0; i < sizeof(remaps)/sizeof(int)/2; i ++)
-    {
-        bpf_map_update_elem(map_fd,
-            &remaps[i * 2],
-            &remaps [i * 2 + 1],
-            BPF_ANY);
-    }
-
-    return 0;
-}
 
 /**
  * Find the first input device and hidraw device associated with a HID device
@@ -261,90 +192,6 @@ int toggle_fnlock(const char *hidraw_path, int fn_lock)
     return 0;
 }
 
-/**
- * Reads the state file to determine the current fn lock state
- * The state file is expected to contain a single integer
- * @return -1 on failure, otherwise 0 for fn_lock on, 1 for fn-lock off
- */
-int read_statefile()
-{
-    const char* state_file_path = "/var/lib/pxFnLock/state";
-    // need to create the directory if it doesn't exist
-    struct stat st;
-    if (stat("/var/lib/pxFnLock", &st) != 0)
-    {
-        // Directory does not exist, create it
-        if (mkdir("/var/lib/pxFnLock", 0755) != 0)
-        {
-            perror("Failed to create state directory");
-            return -1;
-        }
-    }
-
-    int fd = open(state_file_path, O_RDWR | O_CREAT, 0644);
-    if (fd < 0)
-    {
-        perror("Failed to open state file");
-        return -1;
-    }
-
-    // read contents
-    int buffer;
-    ssize_t bytes_read = read(fd, &buffer, sizeof(buffer));
-    int state = FN_LOCK_DEFAULT_VALUE;
-    if (bytes_read > 0)
-    {
-        // reading worked. convert the int
-        printf("Read state from file: %x\n", buffer);
-        if (buffer == 0 || buffer == 1)
-        {
-            printf("found state in file: %d\n", buffer);
-            close(fd);
-            return buffer;
-        }
-    }
-
-    printf("Invalid state in file, using default value\n");
-    // save the state to the file
-    lseek(fd, 0, SEEK_SET); // reset file pointer to the beginning
-    if (write(fd, &state, sizeof(state)) < 0)
-    {
-        perror("Failed to write default state to file");
-        close(fd);
-        return -1;
-    }
-    close(fd);
-    return state;
-}
-
-/**
- * Write the current fn lock state to the state file
- * @param new_state 0 for fn lock on, 1 for fn lock off
- * @return 0 on success, -1 on failure
- */
-int write_state(int new_state)
-{
-    // open state file
-    const char* state_file_path = "/var/lib/pxFnLock/state";
-    int fd = open(state_file_path, O_RDWR);
-    if (fd < 0)
-    {
-        perror("Failed to open state file");
-        return -1;
-    }
-
-    size_t bytesWritten = write(fd, &new_state, sizeof(new_state));
-    if (bytesWritten == 0)
-    {
-        perror("Failed to write default state to file");
-        close(fd);
-        return -1;
-    }
-
-    printf("Write state to file: %d\n", new_state);
-    close(fd);
-    return 0;
-}
 
 int restore(int state)
 {
@@ -376,7 +223,7 @@ int restore(int state)
 
 int main(int argc, char **argv)
 {
-    int fn_state = read_statefile();
+    int fn_state = read_state();
     if (fn_state < 0)
     {
         printf("Failed to read state file\n");
