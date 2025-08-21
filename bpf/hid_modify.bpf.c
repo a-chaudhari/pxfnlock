@@ -30,7 +30,12 @@ int BPF_PROG(modify_hid_event, struct hid_bpf_ctx *hid_ctx)
 
     value = bpf_map_lookup_elem(&remap_map, &data[1]);
     if (value)
+    {
+        bpf_printk("Remapping scancode: %x -> %x", data[1], *value);
         data[1] = *value; // remap the scancode if it exists in the map
+    } else {
+        bpf_printk("No remap found for scancode: %x", data[1]);
+    }
 
     return 0;
 }
