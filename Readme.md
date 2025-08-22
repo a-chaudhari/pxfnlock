@@ -15,8 +15,8 @@ Looking for others to test this on other distros and Asus laptops!
 ## Install
 1. try running the binary as-is and see if it works on your system
    * if it doesn't work, continue with the build instructions below
-2. if it works use `sudo cp px13-fnlock /usr/local/bin/` to copy the binary to a location in your PATH
-3. if you want to run this on boot, copy the service files to `/etc/systemd/system`
+2. if it works use `sudo cp pxFnLock /usr/local/bin/` to copy the binary to a location in your PATH
+3. if you want to run this on boot, copy **both** service files to `/etc/systemd/system`
 4. `sudo systemctl enable --now pxfnlock.service` to enable the service
 
 ## Building
@@ -26,6 +26,7 @@ Looking for others to test this on other distros and Asus laptops!
 
 ## Usage
 1. enabling the systemd service should be all that's necessary
+   * `sudo systemctl enable --now pxfnlock.service`
 2. fn-esc will toggle the Fn lock state.  but there is NO visual indicator of the state change.
    * You can try making your own by listening for the `KEY_PROG3` keycode
 3. feel free to use your tool of choice to bind the emoji and proart keys to something useful.
@@ -41,3 +42,11 @@ drops it (along with a few other ones). This tool packages a bpf program to modi
 | Fn+Esc       | Fn-Lock     | KEY_PROG3         |
 | Fn+F7        | Emoji Key   | KEY_PROG2         |
 | Fn+F12       | ProArt Key  | KEY_PROG1         |
+
+* One can modify the source to add/change/remove remapped scancodes. Create an issue if you need help.
+* Journalctl will show both bpf and userspace logs.
+
+## TODO (maybe, prs welcome 😉):
+- [ ] add a config file to change key mappings and other settings
+- [ ] add a command line option to set/get the fn-lock state via the console
+- [ ] bundle a visual indicator of the fn-lock state change
