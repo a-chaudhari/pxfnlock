@@ -258,7 +258,19 @@ int main(int argc, char **argv)
     printf("Input path: %s\n", devices.input_device);
     printf("Hidraw path: %s\n", devices.hidraw_device);
 
-    err = run_bpf(skel, device_info.hid_id);
+    /*
+     * this is a simple 1d array, add maps as pairs of: original scancode, new scancode
+     * 1. use hid-recorder to find the original scancode from the keyboard
+     * 2. read the hid-asus.c file to see what scancodes are recognized by the driver
+     * 3. remap the original scancode to one that is detected by the driver but isn't used for anything on yours
+     * 4. you can now use that keycode and bind functions using keyd or any other tool
+     */
+    const int remaps[] = {
+        0x4e, 0x5c, // fn-lock (fn + esc) -> key_prog3
+        0x7e, 0xba, // emoji picker key -> key_prog2
+        0x8b, 0x38, // proart hub key -> key_prog1
+    };
+    err = run_bpf(skel, device_info.hid_id, &remaps[0], 3);
     if (err)
     {
         printf("Failed to load BPF\n");

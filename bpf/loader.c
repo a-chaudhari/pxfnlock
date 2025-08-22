@@ -50,7 +50,7 @@ void *poll_ringbuf( void *ptr )
  * @param hid_id: The HID device ID to attach the BPF program to
  * @return 0 on success, -1 on error
  */
-int run_bpf(struct hid_modify_bpf *skel, int hid_id)
+int run_bpf(struct hid_modify_bpf *skel, int hid_id, const int *remap_array, int remap_count)
 {
     int err, map_fd;
     struct ring_buffer *rb = nullptr;
@@ -61,19 +61,6 @@ int run_bpf(struct hid_modify_bpf *skel, int hid_id)
         fprintf(stderr, "Failed to open BPF skeleton\n");
         return -1;
     }
-
-    /*
-     * this is a simple 1d array, add maps as pairs of: original scancode, new scancode
-     * 1. use hid-recorder to find the original scancode from the keyboard
-     * 2. read the hid-asus.c file to see what scancodes are recognized by the driver
-     * 3. remap the original scancode to one that is detected by the driver but isn't used for anything on yours
-     * 4. you can now use that keycode and bind functions using keyd or any other tool
-     */
-    const int remaps[] = {
-        0x4e, 0x5c, // fn-lock (fn + esc) -> key_prog3
-        0x7e, 0xba, // emoji picker key -> key_prog2
-        0x8b, 0x38, // proart hub key -> key_prog1
-    };
 
     skel->struct_ops.hid_modify_ops->hid_id = hid_id;
 
@@ -98,11 +85,14 @@ int run_bpf(struct hid_modify_bpf *skel, int hid_id)
         return -1;
     }
 
-    for (int i = 0; i < sizeof(remaps)/sizeof(int)/2; i ++)
+    for (int i = 0; i < remap_count; i ++)
     {
+        const int *from_code = remap_array + i * 2;
+        const int *to_code = remap_array + i * 2 + 1;
+        printf("Remapped: %x -> %x\n", *from_code, *to_code);
         bpf_map_update_elem(map_fd,
-            &remaps[i * 2],
-            &remaps [i * 2 + 1],
+            from_code,
+            to_code,
             BPF_ANY);
     }
 

@@ -7,6 +7,6 @@
 
 #include "hid_modify.skel.h"
 
-int run_bpf(struct hid_modify_bpf *skel, int hid_id);
+int run_bpf(struct hid_modify_bpf *skel, int hid_id, const int *remap_array, int remap_count);
 
 #endif //HIDTEST3_LOADER_H
